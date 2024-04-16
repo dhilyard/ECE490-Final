@@ -33,18 +33,6 @@ def feature_extraction(imgs):
                      feature_y_var(imgs)), axis=-1)
     return (features - FEATURE_MEAN) / FEATURE_STD
 
-def draw_features(ax, zero_features, one_features):
-    zf = ax.scatter(zero_features[:, 0], zero_features[:, 1], marker='.', label='0', alpha=0.5)
-    of = ax.scatter(one_features[:, 0], one_features[:, 1], marker='+', label='1', alpha=0.3)
-    ax.legend()
-    ax.set_xlabel('Feature 1: count of pixels')
-    ax.set_ylabel('Feature 2: Variance along x-axis')
-    return [zf, of] # return list of artists
-
-fig, ax = plt.subplots()
-draw_features(ax, features[labels > 0, :], features[labels < 0, :])
-plt.savefig("test.png")
-
 
 def loss(predicted_labels, true_labels):
     # Make sure predicted_labels and true_labels have same shape
@@ -107,24 +95,12 @@ def train_by_gradient_descent(model, loss, train_features, train_labels, lr=0.00
               f"train misclassified: {misclassified:04.04f}")
         if niter % 20 == 0:  # plot every 20th iteration
             fig, ax = plt.subplots(1, 1)
-            draw_features(ax,
-                          train_features[predicted_labels.value.ravel() > 0, :],
-                          train_features[predicted_labels.value.ravel() < 0, :])
 
         niter += 1
     return model
 
 
 trained_model = train_by_gradient_descent(model, loss, features, labels)
-
-fig, axes = plt.subplots(1, 2)
-draw_features(axes[0], features[labels > 0, :], features[labels < 0, :])
-axes[0].set_title('Train labels')
-predicted_labels = trained_model(features).value.flatten()
-draw_features(axes[1], features[predicted_labels > 0, :], features[predicted_labels < 0, :])
-axes[1].set_title('Predicted labels');
-plt.savefig("train.png")
-
 # Load MNIST dataset from uint8 byte files
 
 
