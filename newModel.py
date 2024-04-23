@@ -23,10 +23,13 @@ def feature_y_var(imgs):
     return var
 
 zero_one_train_features = np.load('zero_one_train_features.npz')
+print(zero_one_train_features)
 FEATURE_MEAN = zero_one_train_features['mean']
 FEATURE_STD = zero_one_train_features['std']
 features = zero_one_train_features['normed_features']
+print(features)
 labels = zero_one_train_features['labels']
+print(labels)
 
 def feature_extraction(imgs):
     features = np.stack((feature_n_pxls(imgs),

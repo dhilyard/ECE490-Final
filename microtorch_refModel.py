@@ -28,6 +28,7 @@ FEATURE_STD = zero_one_train_features['std']
 features = zero_one_train_features['normed_features']
 labels = zero_one_train_features['labels']
 
+
 def feature_extraction(imgs):
     features = np.stack((feature_n_pxls(imgs),
                      feature_y_var(imgs)), axis=-1)
