@@ -115,7 +115,7 @@ def train_by_gradient_descent(model, loss, train_features, train_labels, lr=0.00
         niter += 1
     return model
 
-
+print(features)
 trained_model = train_by_gradient_descent(model, loss, features, labels)
 
 fig, axes = plt.subplots(1, 2)

@@ -1,14 +1,15 @@
 import os.path
 import pickle
 import tarfile
-from typing import Any, Callable, Optional, Tuple
+from typing import Any, Callable, Optional, Tuple, Generic, TypeVar
 
 import numpy as np
 import requests
 
+T_co = TypeVar('T_co', covariant=True)
 
 # Define the URLs and file names
-class CIFAR_10():
+class CIFAR_10(Generic[T_co]):
 
     url = "https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz"
     direc = "data/cifar-10-batches-py"
@@ -92,6 +93,9 @@ class CIFAR_10():
             else:
                 self.targets.extend(dict["fine_labels"])
         return dict
+
+    def __len__(self) -> int:
+        return len(self.data)
 
 
 
