@@ -28,6 +28,7 @@ FEATURE_STD = zero_one_train_features['std']
 features = zero_one_train_features['normed_features']
 labels = zero_one_train_features['labels']
 
+
 def feature_extraction(imgs):
     features = np.stack((feature_n_pxls(imgs),
                      feature_y_var(imgs)), axis=-1)
@@ -62,6 +63,14 @@ model = tnn.Sequential(
     tnn.Linear(2, 5),
     tnn.ReLU(),
     tnn.Linear(5, 1))
+
+first_linear = tnn.Linear(2, 5)
+first_activation = tnn.ReLU()
+second_linear = tnn.Linear(5, 1)
+
+model2 = tnn.Sequential(first_linear, first_activation, second_linear)
+
+
 
 
 ### END SOLUTION
@@ -106,7 +115,7 @@ def train_by_gradient_descent(model, loss, train_features, train_labels, lr=0.00
         niter += 1
     return model
 
-
+print(features)
 trained_model = train_by_gradient_descent(model, loss, features, labels)
 
 fig, axes = plt.subplots(1, 2)

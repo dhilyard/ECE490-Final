@@ -1,8 +1,10 @@
-# Refs:
+# Refs: 
 # 1. https://github.com/karpathy/micrograd/tree/master/micrograd
 # 2. https://github.com/mattjj/autodidact
 # 3. https://github.com/mattjj/autodidact/blob/master/autograd/numpy/numpy_vjps.py
 # 4. https://github.com/hips/autograd
+# For detailed documentation please refer to 
+# AutogradNumpy.ipynb
 from collections import namedtuple
 import numpy as np
 
@@ -10,8 +12,8 @@ try:
     from graphviz import Digraph
 except ImportError as e:
     import subprocess
-
     subprocess.call("pip install --user graphviz".split())
+
 
 
 def unbroadcast(target, g, axis=0):
@@ -28,19 +30,16 @@ def unbroadcast(target, g, axis=0):
         g = g.real()
     return g
 
-
 Op = namedtuple('Op', ['apply',
-                       'vjp',
-                       'name',
-                       'nargs'])
-
+                   'vjp',
+                   'name',
+                   'nargs'])
 
 def add_vjp(dldf, a, b):
     dlda = unbroadcast(a, dldf)
     dldb = unbroadcast(b, dldf)
     return dlda, dldb
-
-
+    
 add = Op(
     apply=np.add,
     vjp=add_vjp,
@@ -53,28 +52,26 @@ def mul_vjp(dldf, a, b):
     dldb = unbroadcast(b, dldf * a)
     return dlda, dldb
 
-
 mul = Op(
     apply=np.multiply,
     vjp=mul_vjp,
     name='*',
     nargs=2)
 
-
 def matmul_vjp(dldF, A, B):
     G = dldF
     if G.ndim == 0:
         # Case 1: vector-vector multiplication
         assert A.ndim == 1 and B.ndim == 1
-        dldA = G * B
-        dldB = G * A
+        dldA = G*B
+        dldB = G*A
         return (unbroadcast(A, dldA),
                 unbroadcast(B, dldB))
-
+    
     assert not (A.ndim == 1 and B.ndim == 1)
 
     # 1. If both arguments are 2-D they are multiplied like conventional matrices.
-    # 2. If either argument is N-D, N > 2, it is treated as a stack of matrices
+    # 2. If either argument is N-D, N > 2, it is treated as a stack of matrices 
     # residing in the last two indexes and broadcast accordingly.
     if A.ndim >= 2 and B.ndim >= 2:
         dldA = G @ B.swapaxes(-2, -1)
@@ -84,18 +81,18 @@ def matmul_vjp(dldF, A, B):
         #    1 to its dimensions. After matrix multiplication the prepended 1 is removed.
         A_ = A[np.newaxis, :]
         G_ = G[np.newaxis, :]
-        dldA = G @ B.swapaxes(-2, -1)
-        dldB = A_.swapaxes(-2, -1) @ G_  # outer product
+        dldA = G @ B.swapaxes(-2, -1) 
+        dldB = A_.swapaxes(-2, -1) @ G_ # outer product
     elif B.ndim == 1:
-        # 4. If the second argument is 1-D, it is promoted to a matrix by appending
+        # 4. If the second argument is 1-D, it is promoted to a matrix by appending 
         #    a 1 to its dimensions. After matrix multiplication the appended 1 is removed.
         B_ = B[:, np.newaxis]
         G_ = G[:, np.newaxis]
-        dldA = G_ @ B_.swapaxes(-2, -1)  # outer product
+        dldA = G_ @ B_.swapaxes(-2, -1) # outer product
         dldB = A.swapaxes(-2, -1) @ G
-    return (unbroadcast(A, dldA),
+    return (unbroadcast(A, dldA), 
             unbroadcast(B, dldB))
-
+        
 
 matmul = Op(
     apply=np.matmul,
@@ -103,30 +100,24 @@ matmul = Op(
     name='@',
     nargs=2)
 
-
 def exp_vjp(dldf, x):
     dldx = dldf * np.exp(x)
     return (unbroadcast(x, dldx),)
 
-
-exp = Op(
+expop = Op(
     apply=np.exp,
     vjp=exp_vjp,
     name='exp',
     nargs=1)
 
-
 def log_vjp(dldf, x):
     dldx = dldf / x
     return (unbroadcast(x, dldx),)
-
-
-log = Op(
+logop = Op(
     apply=np.log,
     vjp=log_vjp,
     name='log',
     nargs=1)
-
 
 def sum_vjp(dldf, x, axis=None, **kwargs):
     if axis is not None:
@@ -135,19 +126,16 @@ def sum_vjp(dldf, x, axis=None, **kwargs):
         dldx = dldf * np.ones_like(x)
     return (unbroadcast(x, dldx),)
 
-
 sum_ = Op(
     apply=np.sum,
     vjp=sum_vjp,
     name='sum',
     nargs=1)
 
-
 def maximum_vjp(dldf, a, b):
     dlda = dldf * np.where(a > b, 1, 0)
     dldb = dldf * np.where(a > b, 0, 1)
     return unbroadcast(a, dlda), unbroadcast(b, dldb)
-
 
 maxop = Op(
     apply=np.maximum,
@@ -164,23 +152,21 @@ transpose = Op(
 NoOp = Op(apply=None, name='', vjp=None, nargs=0)
 
 
+
 def exp(tensor):
     tensor = tensor if isinstance(tensor, Tensor) else Tensor(tensor)
-    return Tensor(exp.apply(tensor.value),
-                  parents=(tensor,),
-                  op=exp)
-
+    return Tensor(expop.apply(tensor.value),
+                parents=(tensor,),
+                op=expop)
 
 def log(tensor):
     tensor = tensor if isinstance(tensor, Tensor) else Tensor(tensor)
-    return Tensor(log.apply(tensor.value),
-                  parents=(tensor,),
-                  op=log)
-
+    return Tensor(logop.apply(tensor.value),
+                parents=(tensor, ),
+                op=logop)
 
 class Tensor:
     __array_priority__ = 100
-
     def __init__(self, value, grad=None, parents=(), op=NoOp, kwargs={}, requires_grad=True):
         self.value = np.asarray(value)
         self.grad = grad
@@ -188,78 +174,75 @@ class Tensor:
         self.op = op
         self.kwargs = kwargs
         self.requires_grad = requires_grad
-
+    
     shape = property(lambda self: self.value.shape)
-    ndim = property(lambda self: self.value.ndim)
-    size = property(lambda self: self.value.size)
+    ndim  = property(lambda self: self.value.ndim)
+    size  = property(lambda self: self.value.size)
     dtype = property(lambda self: self.value.dtype)
     T = property(lambda self: self.transpose())
-
+    
     def transpose(self, **kw):
         cls = type(self)
         return cls(transpose.apply(self.value, **kw),
                    parents=(self,),
                    kwargs=kw,
                    op=transpose)
-
+    
     def __add__(self, other):
         cls = type(self)
         other = other if isinstance(other, cls) else cls(other)
         return cls(add.apply(self.value, other.value),
                    parents=(self, other),
                    op=add)
-
     __radd__ = __add__
-
+    
     def __mul__(self, other):
         cls = type(self)
         other = other if isinstance(other, cls) else cls(other)
         return cls(mul.apply(self.value, other.value),
                    parents=(self, other),
                    op=mul)
-
     __rmul__ = __mul__
-
+    
     def __matmul__(self, other):
         cls = type(self)
         other = other if isinstance(other, cls) else cls(other)
         return cls(matmul.apply(self.value, other.value),
-                   parents=(self, other),
-                   op=matmul)
-
+                  parents=(self, other),
+                  op=matmul)
     def __rmatmul__(self, other):
         cls = type(self)
         other = other if isinstance(other, cls) else cls(other)
         return other.__matmul__(self)
-
+    
     def __pow__(self, other):
         cls = type(self)
         other = other if isinstance(other, cls) else cls(other)
         return exp(log(self) * other)
-
+    
     def __div__(self, other):
-        return self * (other ** (-1))
-
+        return self * (other**(-1))
+    
     __truediv__ = __div__
-
+    
     def __sub__(self, other):
         return self + (other * (-1))
-
+    
     def __neg__(self):
-        return self * (-1)
-
+        return self*(-1)
+    
     def sum(self, axis=None):
         cls = type(self)
         return cls(sum_.apply(self.value, axis=axis),
                    parents=(self,),
                    op=sum_,
                    kwargs=dict(axis=axis))
-
+        
     def __repr__(self):
         cls = type(self)
         return f"{cls.__name__}(value={self.value}, op={self.op.name})" if self.parents else f"{cls.__name__}(value={self.value})"
-        # return f"{cls.__name__}(value={self.value}, parents={self.parents}, op={self.op}"
-
+        #return f"{cls.__name__}(value={self.value}, parents={self.parents}, op={self.op}"
+    
     def zero_grad(self):
         """
         Sets grad to None
@@ -267,9 +250,9 @@ class Tensor:
         self.grad = None
         for p in self.parents:
             p.zero_grad()
-
+    
     def backward(self, grad):
-        self.grad = grad if self.grad is None else (self.grad + grad)
+        self.grad = grad if self.grad is None else (self.grad+grad)
         if self.requires_grad and self.parents:
             p_vals = [p.value for p in self.parents]
             assert len(p_vals) == self.op.nargs
@@ -277,28 +260,23 @@ class Tensor:
             for p, g in zip(self.parents, p_grads):
                 p.backward(g)
 
-
 def maximum(tensor, other):
     tensor = tensor if isinstance(tensor, Tensor) else Tensor(tensor)
     other = other if isinstance(other, Tensor) else Tensor(other)
     return Tensor(maxop.apply(tensor.value, other.value),
-                  parents=(tensor, other),
-                  op=maxop)
-
+                   parents=(tensor, other),
+                   op=maxop)
 
 def trace(root):
     nodes, edges = set(), set()
-
     def build(v):
         if v not in nodes:
             nodes.add(v)
             for p in v.parents:
                 edges.add((p, v))
                 build(p)
-
     build(root)
     return nodes, edges
-
 
 def draw_dot(root, format='svg', rankdir='LR'):
     """
@@ -307,17 +285,17 @@ def draw_dot(root, format='svg', rankdir='LR'):
     """
     assert rankdir in ['LR', 'TB']
     nodes, edges = trace(root)
-    dot = Digraph(format=format, graph_attr={'rankdir': rankdir})  # , node_attr={'rankdir': 'TB'})
-
+    dot = Digraph(format=format, graph_attr={'rankdir': rankdir}) #, node_attr={'rankdir': 'TB'})
+    
     for n in nodes:
         vstr = np.array2string(np.asarray(n.value), precision=4)
-        gradstr = np.array2string(np.asarray(n.grad), precision=4)
-        dot.node(name=str(id(n)), label=f"{{v={vstr} | g={gradstr}}}", shape='record')
+        gradstr= np.array2string(np.asarray(n.grad), precision=4)
+        dot.node(name=str(id(n)), label = f"{{v={vstr} | g={gradstr}}}", shape='record')
         if n.parents:
             dot.node(name=str(id(n)) + n.op.name, label=n.op.name)
             dot.edge(str(id(n)) + n.op.name, str(id(n)))
-
+    
     for n1, n2 in edges:
         dot.edge(str(id(n1)), str(id(n2)) + n2.op.name)
-
+    
     return dot
