@@ -148,9 +148,3 @@ def mse_loss(yhat, y):
 
 def thresholded_l1_loss(yhat, y):
     return t.maximum(-yhat * y, 0)
-
-
-    
-
-
-
