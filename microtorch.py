@@ -8,6 +8,14 @@
 from collections import namedtuple
 import numpy as np
 
+# Define the Op class for operations in the computational graph
+class Op:
+    def __init__(self, apply, vjp, name, nargs):
+        self.apply = apply  # Function to apply operation
+        self.vjp = vjp      # Function to compute gradients (Jacobian-vector product)
+        self.name = name    # Name of the operation
+        self.nargs = nargs  # Number of input arguments expected by the operation
+
 try:
     from graphviz import Digraph
 except ImportError as e:
@@ -252,11 +260,11 @@ class Tensor:
             p.zero_grad()
     
     def backward(self, grad):
-        self.grad = grad if self.grad is None else (self.grad+grad)
+        self.grad = grad if self.grad is None else (self.grad + grad)
         if self.requires_grad and self.parents:
             p_vals = [p.value for p in self.parents]
             assert len(p_vals) == self.op.nargs
-            p_grads = self.op.vjp(grad, *p_vals, **self.kwargs)
+            p_grads = self.op.vjp(grad, *p_vals)  # Use the vjp function of the Op class
             for p, g in zip(self.parents, p_grads):
                 p.backward(g)
 

@@ -42,16 +42,13 @@ class Conv2d(tnn.Module):
         x_padded = np.pad(x.value, ((0, 0), (0, 0), (self.padding, self.padding), (self.padding, self.padding)), mode='constant')
         output = np.zeros((batch_size, self.out_channels, out_height, out_width))
 
-        for batch in range(batch_size):
-            for out_channel in range(self.out_channels):
-                for height_stride in range(out_height):
-                    for width_stride in range(out_width):
-                        input_slice = x_padded[batch, :, height_stride * self.stride:height_stride * self.stride + kernel_height,
-                                       width_stride * self.stride:width_stride * self.stride + kernel_width]
-                        kernel_slice = self.weight.value[out_channel]
-                        output[batch, out_channel, height_stride, width_stride] = (input_slice * kernel_slice).sum() + self.bias.value[out_channel]
-
-                        print("Shape of input_slice:", batch, batch_size)
+        for out_channel in range(self.out_channels):
+            for height_stride in range(out_height):
+                for width_stride in range(out_width):
+                    input_slice = x_padded[:, :, height_stride * self.stride:height_stride * self.stride + kernel_height,
+                                   width_stride * self.stride:width_stride * self.stride + kernel_width]
+                    kernel_slice = self.weight.value[out_channel]
+                    output[:, out_channel, height_stride, width_stride] = (input_slice * kernel_slice).sum(axis=(1, 2, 3)) + self.bias.value[out_channel]
 
         return t.Tensor(output, parents=[t.Tensor(x), self.weight, self.bias], op=self)
 
@@ -73,17 +70,17 @@ class MaxPool2d(tnn.Module):
             for channel in range(channels):
                 for height_stride in range(out_height):
                     for width_stride in range(out_width):
-                        input_slice = x[batch, channel, height_stride * self.stride:height_stride * self.stride + kernel_height,
-                                       width_stride * self.stride:width_stride * self.stride + kernel_width]
+                        input_slice = x.value[batch, channel, height_stride * self.stride:height_stride * self.stride + kernel_height,
+                                                width_stride * self.stride:width_stride * self.stride + kernel_width]
                         output[batch, channel, height_stride, width_stride] = input_slice.max()
 
         return t.Tensor(output, parents=[t.Tensor(x)], op=self)
 
-# Define the Flatten layer
 class Flatten(tnn.Module):
     def forward(self, x):
         batch_size, channels, height, width = x.shape
-        return t.Tensor(x.reshape(batch_size, -1), parents=[t.Tensor(x)], op=self)
+        x_reshaped = x.value.reshape(batch_size, -1)
+        return t.Tensor(x_reshaped, parents=[t.Tensor(x)], op=self)
 
 # Define the optimizer
 class Adam:
@@ -125,19 +122,34 @@ model = tnn.Sequential(
 optimizer = Adam(model.parameters(), lr=0.001)
 
 # Train the model
-def train(model, loss, optimizer, X_train, y_train, epochs=10):
+def train(model, loss, optimizer, X_train, y_train, batch_size=64, epochs=10):
+    num_batches = X_train.shape[0] // batch_size
     for epoch in range(epochs):
-        predicted_labels = model(t.Tensor(X_train))
-        loss_value = loss(predicted_labels, t.Tensor(y_train))
-        loss_value.backward()
+        epoch_loss = 0
+        for batch in range(num_batches):
+            start = batch * batch_size
+            end = start + batch_size
+            X_batch = X_train[start:end]
+            y_batch = y_train[start:end]
 
-        optimizer.step()
-        optimizer.zero_grad()
+            predicted_labels = model(t.Tensor(X_batch))
+            loss_value = loss(predicted_labels, t.Tensor(y_batch))
+            
+            # Initialize gradient with respect to the loss
+            grad = t.Tensor(np.ones_like(loss_value.value))
+            
+            loss_value.backward(grad)  # Pass the gradient to the backward method
 
-        print(f"Epoch {epoch+1}/{epochs}, Loss: {loss_value.value:.4f}")
+            optimizer.step()
+            optimizer.zero_grad()
+
+            epoch_loss += loss_value.value
+
+        epoch_loss /= num_batches
+        print(f"Epoch {epoch+1}/{epochs}, Loss: {epoch_loss:.4f}")
 
 # Train the model
-train(model, cross_entropy_loss, optimizer, X_train, y_train, epochs=10)
+train(model, cross_entropy_loss, optimizer, X_train, y_train, batch_size=64, epochs=10)
 
 # Evaluate the model on the test set
 def evaluate(model, X_test, y_test):
